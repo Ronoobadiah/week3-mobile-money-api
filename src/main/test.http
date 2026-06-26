@@ -1,0 +1,40 @@
+### GET request to example server
+GET https://examples.http-client.intellij.net/get
+    ?generated-in=IntelliJ IDEA
+
+### Create account
+POST http://localhost:8080/accounts
+Content-Type: application/json
+
+{
+  "phoneNumber": "072293177",
+  "fullName": "Obadia Kimutai",
+  "tier": "BASIC"
+}
+
+### Get account
+GET http://localhost:8080/accounts/21040bad-304e-4ae4-9683-68810de8d4e7
+
+### Deposit
+POST http://localhost:8080/accounts/21040bad-304e-4ae4-9683-68810de8d4e7/deposit
+Content-Type: application/json
+
+{
+  "amount": 5000,
+  "description": "Initial deposit"
+}
+
+### Withdraw
+POST http://localhost:8080/accounts/21040bad-304e-4ae4-9683-68810de8d4e7/withdraw
+Content-Type: application/json
+
+{
+  "amount": 1000,
+  "description": "Test withdrawal"
+}
+
+### Get balance
+GET http://localhost:8080/accounts/21040bad-304e-4ae4-9683-68810de8d4e7/balance
+
+### Get transactions
+GET http://localhost:8080/accounts/21040bad-304e-4ae4-9683-68810de8d4e7/transactions
