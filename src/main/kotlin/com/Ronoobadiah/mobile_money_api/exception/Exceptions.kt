@@ -16,3 +16,6 @@ class DailyLimitExceededException(limit: Double, remaining: Double) :
 
 class MaxBalanceExceededException(maxBalance: Double, currentBalance: Double) :
     RuntimeException("Deposit would exceed tier max balance of KES $maxBalance. Current: KES $currentBalance")
+
+class SameAccountTransferException :
+    RuntimeException("Cannot transfer to the same account")

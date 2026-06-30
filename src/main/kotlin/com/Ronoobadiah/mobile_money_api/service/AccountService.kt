@@ -7,10 +7,13 @@ import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 
 @Service
 class AccountService {
 
+    private val logger = LoggerFactory.getLogger(AccountService::class.java)
     private val accounts = ConcurrentHashMap<String, Account>()
     private val transactions = ConcurrentHashMap<String, MutableList<TransactionRecord>>()
 
@@ -62,58 +65,83 @@ class AccountService {
 
     // <--- Deposit ---->
     fun deposit(request: DepositRequest): TransactionRecord {
+        MDC.put("phoneNumber", "")
+        MDC.put("operation", "DEPOSIT")
+
         val account = getAccount(request.id)
+        MDC.put("phoneNumber", account.phoneNumber)
 
-        if (account.status != AccountStatus.ACTIVE)
+        if (account.status != AccountStatus.ACTIVE) {
+            logger.warn("Deposit failed: account {} is {}", request.id, account.status)
             throw AccountNotActiveException(request.id, account.status)
+        }
 
-        if (account.balance + request.amount > account.tier.maxBalance)
+        if (account.balance + request.amount > account.tier.maxBalance) {
+            logger.warn("Deposit failed: would exceed max balance for account {}", request.id)
             throw MaxBalanceExceededException(account.tier.maxBalance, account.balance)
+        }
 
         val balanceBefore = account.balance
         account.balance += request.amount
 
-        return recordTransaction(account, TransactionType.DEPOSIT, request.amount, balanceBefore, request.description)
+        val record = recordTransaction(account, TransactionType.DEPOSIT, request.amount, balanceBefore, request.description)
+
+        logger.info(
+            "Transaction success: accountId={}, amount={}, type={}, balanceBefore={}, balanceAfter={}",
+            account.id, request.amount, TransactionType.DEPOSIT, balanceBefore, account.balance
+        )
+
+        return record
     }
 
     // <--- Withdraw ---->
     fun withdraw(request: WithdrawRequest): TransactionRecord {
+        MDC.put("operation", "WITHDRAWAL")
         val account = getAccount(request.id)
+        MDC.put("phoneNumber", account.phoneNumber)
 
-        if (account.status != AccountStatus.ACTIVE)
+        if (account.status != AccountStatus.ACTIVE) {
+            logger.warn("Withdrawal failed: account {} is {}", request.id, account.status)
             throw AccountNotActiveException(request.id, account.status)
+        }
 
-        if (request.amount > account.balance)
+        if (request.amount > account.balance) {
+            logger.warn("Withdrawal failed: insufficient balance for account {}", request.id)
             throw InsufficientBalanceException(account.balance, request.amount)
+        }
 
         val remaining = account.tier.dailyLimit - account.dailyUsed
-        if (request.amount > remaining)
+        if (request.amount > remaining) {
+            logger.warn("Withdrawal failed: daily limit exceeded for account {}", request.id)
             throw DailyLimitExceededException(account.tier.dailyLimit, remaining)
+        }
 
         val balanceBefore = account.balance
         account.balance -= request.amount
         account.dailyUsed += request.amount
 
-        return recordTransaction(account, TransactionType.WITHDRAWAL, request.amount, balanceBefore, request.description)
+        val record = recordTransaction(account, TransactionType.WITHDRAWAL, request.amount, balanceBefore, request.description)
+
+        logger.info(
+            "Transaction success: accountId={}, amount={}, type={}, balanceBefore={}, balanceAfter={}",
+            account.id, request.amount, TransactionType.WITHDRAWAL, balanceBefore, account.balance
+        )
+
+        return record
     }
+
 
     // <--- Transfer ---->
 
     fun transfer(request: TransferRequest): TransactionRecord {
+        if (request.fromId == request.toId) {
+            throw SameAccountTransferException()
+        }
 
-        val withdrawRequest = WithdrawRequest(
-            id = request.fromId,
-            amount = request.amount,
-            description = request.copy(description = "Transfer to ${request.toId}: ${request.description}").description
-        )
+        val withdrawRequest = WithdrawRequest(id = request.fromId, amount = request.amount, description = "Transfer to ${request.toId}: ${request.description}")
         val withdrawRecord = withdraw(withdrawRequest)
 
-        val depositRequest = DepositRequest(
-            id = request.toId,
-            amount = request.amount,
-            description = request.copy(description = "Transfer from ${request.fromId}: ${request.description}").description
-        )
-
+        val depositRequest = DepositRequest(id = request.toId, amount = request.amount, description = "Transfer from ${request.fromId}: ${request.description}")
         deposit(depositRequest)
 
         return withdrawRecord

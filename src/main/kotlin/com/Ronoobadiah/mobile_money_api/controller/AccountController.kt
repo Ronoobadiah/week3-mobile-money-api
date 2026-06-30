@@ -6,16 +6,27 @@ import com.ronoobadiah.mobile_money_api.service.AccountService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import jakarta.validation.Valid
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.tags.Tag
 
 
 @RestController
 @RequestMapping("/accounts")
+@Tag(name = "Accounts", description = "Mobile money account management")
 class AccountController(
     private val accountService: AccountService
 ) {
 
+    @Operation(summary = "Create a new account", description = "Creates an account with the given phone number, name, and tier")
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "201", description = "Account created successfully"),
+        ApiResponse(responseCode = "400", description = "Validation failed on one or more fields")
+    ])
     @PostMapping
-    fun createAccount(@RequestBody request: CreateAccountRequest): ResponseEntity<Account> {
+    fun createAccount(@Valid @RequestBody request: CreateAccountRequest): ResponseEntity<Account> {
         return ResponseEntity.status(HttpStatus.CREATED).body(accountService.createAccount(request))
     }
 
@@ -32,7 +43,7 @@ class AccountController(
     @PatchMapping("/{id}/status")
     fun updateStatus(
         @PathVariable id: String,
-        @RequestBody request: UpdateStatusRequest
+        @Valid @RequestBody request: UpdateStatusRequest
     ): ResponseEntity<Account> {
         return ResponseEntity.ok(accountService.updateStatus(request.copy(id = id)))
     }
@@ -40,29 +51,46 @@ class AccountController(
     @PutMapping("/{id}/tier")
     fun updateTier(
         @PathVariable id: String,
-        @RequestBody request: UpdateTierRequest
+        @Valid @RequestBody request: UpdateTierRequest
     ): ResponseEntity<Account> {
         return ResponseEntity.ok(accountService.updateTier(request.copy(id = id)))
     }
 
+    // <--- DEPOSIT ---->
+    @Operation(summary = "Deposit money", description = "Deposits an amount into the specified account, subject to tier max balance")
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Deposit successful"),
+        ApiResponse(responseCode = "403", description = "Account is suspended or closed"),
+        ApiResponse(responseCode = "404", description = "Account not found"),
+        ApiResponse(responseCode = "422", description = "Deposit would exceed tier max balance or amount invalid")
+    ])
     @PostMapping("/{id}/deposit")
     fun deposit(
         @PathVariable id: String,
-        @RequestBody request: DepositRequest
+        @Valid @RequestBody request: DepositRequest
     ): ResponseEntity<TransactionRecord> {
         return ResponseEntity.ok(accountService.deposit(request.copy(id = id)))
     }
 
+   // <--- WITHDRAW ---->
+    @Operation(summary = "Withdraw money", description = "Withdraw an amount into the specified account, subject to Daily limit")
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Withdrawal successful"),
+        ApiResponse(responseCode = "403", description = "Account is suspended or closed"),
+        ApiResponse(responseCode = "404", description = "Account not found"),
+        ApiResponse(responseCode = "422", description = "Withdrawal would exceed daily limit or amount invalid")
+    ])
     @PostMapping("/{id}/withdraw")
     fun withdraw(
         @PathVariable id: String,
-        @RequestBody request: WithdrawRequest
+        @Valid @RequestBody request: WithdrawRequest
     ): ResponseEntity<TransactionRecord> {
         return ResponseEntity.ok(accountService.withdraw(request.copy(id = id)))
     }
 
+    // <--- TRANSFER ---->
     @PostMapping("/transfer")
-    fun transfer(@RequestBody request: TransferRequest): ResponseEntity<TransactionRecord> {
+    fun transfer(@Valid @RequestBody request: TransferRequest): ResponseEntity<TransactionRecord> {
         return ResponseEntity.ok(accountService.transfer(request))
     }
 
