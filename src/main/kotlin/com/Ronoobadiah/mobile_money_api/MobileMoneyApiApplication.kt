@@ -1,4 +1,4 @@
-package com.Ronoobadiah.mobile_money_api
+package com.ronoobadiah.mobile_money_api
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

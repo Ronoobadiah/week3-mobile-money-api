@@ -1,6 +1,6 @@
-package com.Ronoobadiah.mobile_money_api.exception
+package com.ronoobadiah.mobile_money_api.exception
 
-import com.Ronoobadiah.mobile_money_api.model.AccountStatus
+import com.ronoobadiah.mobile_money_api.model.AccountStatus
 
 class AccountNotFoundException(id: String) :
     RuntimeException("Account not found: $id")

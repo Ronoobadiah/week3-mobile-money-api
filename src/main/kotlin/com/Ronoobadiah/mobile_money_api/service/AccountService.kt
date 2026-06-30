@@ -1,7 +1,8 @@
-package com.Ronoobadiah.mobile_money_api.service
+package com.ronoobadiah.mobile_money_api.service
 
-import com.Ronoobadiah.mobile_money_api.exception.*
-import com.Ronoobadiah.mobile_money_api.model.*
+import com.ronoobadiah.mobile_money_api.dto.*
+import com.ronoobadiah.mobile_money_api.exception.*
+import com.ronoobadiah.mobile_money_api.model.*
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.UUID
@@ -14,12 +15,12 @@ class AccountService {
     private val transactions = ConcurrentHashMap<String, MutableList<TransactionRecord>>()
 
     // <--- Create account --->
-    fun createAccount(phoneNumber: String, fullName: String, tier: AccountTier): Account {
+    fun createAccount(request: CreateAccountRequest): Account {
         val account = Account(
             id = UUID.randomUUID().toString(),
-            phoneNumber = phoneNumber,
-            fullName = fullName,
-            tier = tier,
+            phoneNumber = request.phoneNumber,
+            fullName = request.fullName,
+            tier = request.tier,
             status = AccountStatus.ACTIVE,
             balance = 0.0,
             createdAt = LocalDateTime.now().toString()
@@ -46,64 +47,74 @@ class AccountService {
     }
 
     // <--- Update status --->
-    fun updateStatus(id: String, newStatus: AccountStatus): Account {
-        val account = getAccount(id)
-        account.status = newStatus
+    fun updateStatus(request: UpdateStatusRequest): Account {
+        val account = getAccount(request.id)
+        account.status = request.status
         return account
     }
 
     // <--- Update tier ---->
-    fun updateTier(id: String, newTier: AccountTier): Account {
-        val account = getAccount(id)
-        account.tier = newTier
+    fun updateTier(request: UpdateTierRequest): Account {
+        val account = getAccount(request.id)
+        account.tier = request.tier
         return account
     }
 
     // <--- Deposit ---->
-    fun deposit(id: String, amount: Double, description: String): TransactionRecord {
-        val account = getAccount(id)
+    fun deposit(request: DepositRequest): TransactionRecord {
+        val account = getAccount(request.id)
 
         if (account.status != AccountStatus.ACTIVE)
-            throw AccountNotActiveException(id, account.status)
+            throw AccountNotActiveException(request.id, account.status)
 
-        if (account.balance + amount > account.tier.maxBalance)
+        if (account.balance + request.amount > account.tier.maxBalance)
             throw MaxBalanceExceededException(account.tier.maxBalance, account.balance)
 
         val balanceBefore = account.balance
-        account.balance += amount
+        account.balance += request.amount
 
-        return recordTransaction(account, TransactionType.DEPOSIT, amount, balanceBefore, description)
+        return recordTransaction(account, TransactionType.DEPOSIT, request.amount, balanceBefore, request.description)
     }
 
     // <--- Withdraw ---->
-    fun withdraw(id: String, amount: Double, description: String): TransactionRecord {
-        val account = getAccount(id)
+    fun withdraw(request: WithdrawRequest): TransactionRecord {
+        val account = getAccount(request.id)
 
         if (account.status != AccountStatus.ACTIVE)
-            throw AccountNotActiveException(id, account.status)
+            throw AccountNotActiveException(request.id, account.status)
 
-        if (amount > account.balance)
-            throw InsufficientBalanceException(account.balance, amount)
-
+        if (request.amount > account.balance)
+            throw InsufficientBalanceException(account.balance, request.amount)
 
         val remaining = account.tier.dailyLimit - account.dailyUsed
-        if (amount > remaining)
+        if (request.amount > remaining)
             throw DailyLimitExceededException(account.tier.dailyLimit, remaining)
 
         val balanceBefore = account.balance
-        account.balance -= amount
-        account.dailyUsed += amount
+        account.balance -= request.amount
+        account.dailyUsed += request.amount
 
-        return recordTransaction(account, TransactionType.WITHDRAWAL, amount, balanceBefore, description)
+        return recordTransaction(account, TransactionType.WITHDRAWAL, request.amount, balanceBefore, request.description)
     }
 
     // <--- Transfer ---->
 
-    fun transfer(fromId: String, toId: String, amount: Double, description: String): TransactionRecord {
+    fun transfer(request: TransferRequest): TransactionRecord {
 
-        val withdrawRecord = withdraw(fromId, amount, "Transfer to $toId: $description")
+        val withdrawRequest = WithdrawRequest(
+            id = request.fromId,
+            amount = request.amount,
+            description = request.copy(description = "Transfer to ${request.toId}: ${request.description}").description
+        )
+        val withdrawRecord = withdraw(withdrawRequest)
 
-        deposit(toId, amount, "Transfer from $fromId: $description")
+        val depositRequest = DepositRequest(
+            id = request.toId,
+            amount = request.amount,
+            description = request.copy(description = "Transfer from ${request.fromId}: ${request.description}").description
+        )
+
+        deposit(depositRequest)
 
         return withdrawRecord
     }
@@ -115,12 +126,10 @@ class AccountService {
         from: Long? = null,
         to: Long? = null
     ): List<TransactionRecord> {
-        getAccount(id) // validates account exists
+        getAccount(id)
         val all = transactions[id] ?: emptyList()
-
         return all.filter { tx ->
-            val typeMatch = type == null || tx.type == type
-            typeMatch
+            type == null || tx.type == type
         }
     }
 

@@ -1,4 +1,4 @@
-package com.Ronoobadiah.mobile_money_api.exception
+package com.ronoobadiah.mobile_money_api.exception
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

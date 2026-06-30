@@ -1,4 +1,4 @@
-package com.Ronoobadiah.mobile_money_api.model
+package com.ronoobadiah.mobile_money_api.model
 
 enum class AccountStatus { ACTIVE, SUSPENDED, CLOSED }
 
